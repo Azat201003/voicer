@@ -2,22 +2,24 @@
 #include "utils.hpp"
 #include "settings.hpp"
 #include <cstddef>
-#include <iostream>
-#include <iterator>
-#include <ostream>
 
 void FullyConnectedLayer::fill() {
 	weights = new __float128*[inputSize];
+	weightsChange = new __float128*[inputSize];
 	for (std::size_t i = 0; i < inputSize; ++i) {
 		weights[i] = new __float128[outputSize];
+		weightsChange[i] = new __float128[outputSize];
 		for (std::size_t j = 0; j < outputSize; ++j) {
 			weights[i][j] = randomFloat128()*2-1;
+			weightsChange[i][j] = 0;
 		}
 	}
 
 	biases = new __float128[outputSize];
+	biasesChange = new __float128[outputSize];
 	for (std::size_t j = 0; j < outputSize; ++j) {
 		biases[j] = randomFloat128()*2-1;
+		biasesChange[j] = 0;
 	}
 }
 
@@ -44,17 +46,18 @@ void FullyConnectedLayer::calc(__float128 *x, __float128 *y) {
 void FullyConnectedLayer::train(__float128 *o, __float128 *z) {
 	for (std::size_t i = 0; i < inputSize; ++i) {
 		for (std::size_t j = 0; j < outputSize; ++j) {
-			weights[i][j] -= SPEED_LEARNING*o[i]*z[j];
+			weightsChange[i][j] = DECAY_FACTOR*weightsChange[i][j] - SPEED_LEARNING*o[i]*z[j];
+			weights[i][j] += weightsChange[i][j];
 		}
 	}
 
-	for (std::size_t _j = 0; _j < outputSize; ++_j) {
-		biases[_j] -= SPEED_LEARNING*z[_j];
+	for (std::size_t j = 0; j < outputSize; ++j) {
+		biasesChange[j] = DECAY_FACTOR*biasesChange[j] - SPEED_LEARNING*z[j];
+		biases[j] += biasesChange[j];
 	}
 }
 
 void FullyConnectedLayer::sigma(__float128 *x, __float128 *i, __float128 *y) {
-	//std::cout << "Sigma" << std::endl;
 	for (std::size_t _i = 0; _i < inputSize; ++_i) {
 		y[_i] = 0;
 		for (std::size_t _j = 0; _j < outputSize; ++_j) {
@@ -80,16 +83,21 @@ ConvolutionalLayer::ConvolutionalLayer(std::vector<std::size_t> _inputSize, std:
 	}
 
 	weights = new __float128*[scanSize];
+	weightsChange = new __float128*[scanSize];
 	for (std::size_t i = 0; i < scanSize; ++i) {
 		weights[i] = new __float128[layersCount];
+		weightsChange[i] = new __float128[layersCount];
 		for (std::size_t j = 0; j < layersCount; ++j) {
 			weights[i][j] = randomFloat128()*2-1;
+			weightsChange[i][j] = 0;
 		}
 	}
 
 	biases = new __float128[layersCount];
+	biasesChange = new __float128[layersCount];
 	for (std::size_t j = 0; j < layersCount; ++j) {
 		biases[j] = randomFloat128()*2-1;
+		biasesChange[j] = 0;
 	}
 }
 
@@ -131,12 +139,36 @@ void ConvolutionalLayer::calc(__float128 *x, __float128 *y) {
 	}
 }
 
+void ConvolutionalLayer::train(__float128 *o, __float128 *z) {
+	for (std::size_t i = 0; i < inputSize; ++i) {
+		for (std::size_t j = 0; j < outputSize; ++j) {
+			weights[i][j] -= SPEED_LEARNING*o[i]*z[j];
+		}
+	}
+
+	for (std::size_t _j = 0; _j < outputSize; ++_j) {
+		biases[_j] -= SPEED_LEARNING*z[_j];
+	}
+}
+
+void ConvolutionalLayer::sigma(__float128 *x, __float128 *i, __float128 *y) {
+	//std::cout << "Sigma" << std::endl;
+	for (std::size_t _i = 0; _i < inputSize; ++_i) {
+		y[_i] = 0;
+		for (std::size_t _j = 0; _j < outputSize; ++_j) {
+			y[_i] += i[_i] * (1 - i[_i]) * x[_j] * weights[_i][_j];
+		}
+	}
+}
+
+// [i=i*2=i*o*2=o*2=o]
 LayerContainer* createSimpleLayers(std::size_t inputSize, std::size_t outputSize) {
-	auto** layers = new Layer*[3] {
-		new FullyConnectedLayer(inputSize, inputSize*3),
-		new FullyConnectedLayer(inputSize*3, outputSize*3),
-		new FullyConnectedLayer(outputSize*3, outputSize),
+	auto** layers = new Layer*[4] {
+		new FullyConnectedLayer(inputSize, inputSize*2),
+		new FullyConnectedLayer(inputSize*2, inputSize*outputSize*2),
+		new FullyConnectedLayer(inputSize*outputSize*2, outputSize*2),
+		new FullyConnectedLayer(outputSize*2, outputSize),
 	};
 
-	return new LayerContainer{layers, 3};
+	return new LayerContainer{layers, 4};
 }

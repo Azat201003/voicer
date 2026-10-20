@@ -34,6 +34,8 @@ private:
 	std::size_t layersCount;
 	__float128** weights;
 	__float128* biases;
+	__float128** weightsChange;
+	__float128* biasesChange;
 };
 
 class PoolingLayer : public Layer {
@@ -64,6 +66,8 @@ public:
 private:
 	__float128** weights;
 	__float128* biases;
+	__float128** weightsChange;
+	__float128* biasesChange;
 };
 
 class LayerContainerBuilder;
